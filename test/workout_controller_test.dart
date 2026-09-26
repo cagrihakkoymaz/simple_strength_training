@@ -1,0 +1,103 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_strength_training/logic/workout_plan.dart';
+import 'package:simple_strength_training/models/exercise.dart';
+import 'package:simple_strength_training/state/rest_alerts.dart';
+import 'package:simple_strength_training/state/workout_controller.dart';
+
+class FakeAlerts implements RestAlerts {
+  final scheduled = <DateTime>[];
+  int cancels = 0;
+  int inApp = 0;
+  @override
+  Future<void> scheduleRestEnd(DateTime at, String body) async => scheduled.add(at);
+  @override
+  Future<void> cancelRestEnd() async => cancels++;
+  @override
+  void restEndedInApp() => inApp++;
+}
+
+void main() {
+  late DateTime now;
+  late FakeAlerts alerts;
+  const pullups = Exercise(id: 1, name: 'Pull-ups', currentMax: 11);
+  const pushups = Exercise(id: 2, name: 'Push-ups', currentMax: 20);
+
+  WorkoutController make(WorkoutMode mode, {int rest = 60}) => WorkoutController(
+    exercises: const [pullups, pushups],
+    mode: mode,
+    setRestSeconds: rest,
+    exerciseRestSeconds: 0,
+    alerts: alerts,
+    clock: () => now,
+  );
+
+  setUp(() {
+    now = DateTime(2026, 9, 26, 10);
+    alerts = FakeAlerts();
+  });
+
+  test('targets come from the table', () {
+    final c = make(WorkoutMode.straight);
+    expect(c.targets[0], [5, 5, 4, 4, 4, 3, 3]);
+    expect(c.targets[1], [8, 9, 8, 8, 8, 6, 3]);
+    c.dispose();
+  });
+
+  test('success, rest, timer end, next set', () {
+    final c = make(WorkoutMode.straight);
+    c.logSet();
+    expect(c.actuals[0][0], 5);
+    expect(c.phase, WorkoutPhase.resting);
+    expect(c.restRemainingSeconds, 60);
+    expect(alerts.scheduled.single, now.add(const Duration(seconds: 60)));
+    expect(c.current.setIndex, 1); // next set shown during rest
+
+    now = now.add(const Duration(seconds: 30));
+    c.adjustRest(15);
+    expect(c.restRemainingSeconds, 45);
+
+    now = now.add(const Duration(seconds: 45));
+    c.tick();
+    expect(c.phase, WorkoutPhase.working);
+    expect(alerts.inApp, 1);
+    c.dispose();
+  });
+
+  test('failed set records real reps and workout continues', () {
+    final c = make(WorkoutMode.circuit, rest: 0);
+    c.logSet(3); // pull-ups set 1 failed (goal 5)
+    expect(c.phase, WorkoutPhase.working);
+    expect(c.currentExercise.name, 'Push-ups');
+    c.logSet();
+    expect(c.currentExercise.name, 'Pull-ups');
+    expect(c.current.setIndex, 1);
+    expect(c.unbrokenFor(0), isFalse);
+    c.dispose();
+  });
+
+  test('complete workout, edit a set, build session', () {
+    final c = make(WorkoutMode.straight, rest: 0);
+    for (var i = 0; i < 14; i++) {
+      c.logSet();
+    }
+    expect(c.phase, WorkoutPhase.finished);
+    expect(c.unbrokenFor(0), isTrue);
+    c.editSet(1, 6, 1);
+    expect(c.unbrokenFor(1), isFalse);
+    final s = c.buildSession({0: true, 1: false});
+    expect(s.results[0].advanced, isTrue);
+    expect(s.results[1].actuals.last, 1);
+    expect(s.results[1].unbroken, isFalse);
+    c.dispose();
+  });
+
+  test('finish early fills remaining sets with 0', () {
+    final c = make(WorkoutMode.straight);
+    c.logSet();
+    c.finishEarly();
+    expect(c.phase, WorkoutPhase.finished);
+    expect(c.actualsFor(0), [5, 0, 0, 0, 0, 0, 0]);
+    expect(alerts.cancels, greaterThan(0));
+    c.dispose();
+  });
+}
