@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../data/goliaz_table.dart';
 import '../models/exercise.dart';
 import '../state/app_state.dart';
+import '../state/rest_alerts.dart';
 import '../state/settings.dart';
 import 'widgets/common.dart';
 
@@ -59,6 +60,34 @@ class SettingsScreen extends StatelessWidget {
                 for (final m in RestAlertMode.values) DropdownMenuItem(value: m, child: Text(m.label)),
               ],
             ),
+          ),
+          SwitchListTile(
+            title: const Text('Countdown beeps'),
+            subtitle: const Text('Beep each of the last 5 seconds of rest'),
+            value: settings.countdownBeeps,
+            onChanged: settings.restAlertMode == RestAlertMode.soundAndVibration ? settings.setCountdownBeeps : null,
+          ),
+          ListTile(
+            title: const Text('Other music while beeping'),
+            subtitle: const Text('YouTube Music, Spotify, etc.'),
+            trailing: DropdownButton<OtherAudioMode>(
+              value: settings.otherAudioMode,
+              underline: const SizedBox.shrink(),
+              onChanged: (m) => settings.setOtherAudioMode(m!),
+              items: [
+                for (final m in OtherAudioMode.values) DropdownMenuItem(value: m, child: Text(m.label)),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_up),
+            title: const Text('Test countdown'),
+            subtitle: const Text('Uses media volume, so it works in silent / Do Not Disturb'),
+            onTap: () {
+              final alerts = context.read<RestAlerts>();
+              alerts.stopSounds();
+              alerts.countdownStarted(const Duration(seconds: kCountdownSeconds));
+            },
           ),
           header('Exercises'),
           for (final e in app.exercises)

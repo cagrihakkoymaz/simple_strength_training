@@ -8,12 +8,18 @@ class FakeAlerts implements RestAlerts {
   final scheduled = <DateTime>[];
   int cancels = 0;
   int inApp = 0;
+  final countdowns = <Duration>[];
+  int stops = 0;
   @override
   Future<void> scheduleRestEnd(DateTime at, String body) async => scheduled.add(at);
   @override
   Future<void> cancelRestEnd() async => cancels++;
   @override
   void restEndedInApp() => inApp++;
+  @override
+  void countdownStarted(Duration remaining) => countdowns.add(remaining);
+  @override
+  void stopSounds() => stops++;
 }
 
 void main() {
@@ -98,6 +104,41 @@ void main() {
     expect(c.phase, WorkoutPhase.finished);
     expect(c.actualsFor(0), [5, 0, 0, 0, 0, 0, 0]);
     expect(alerts.cancels, greaterThan(0));
+    c.dispose();
+  });
+
+  test('countdown fires once in the last 5 s and restarts after +15 s', () {
+    final c = make(WorkoutMode.straight);
+    c.logSet();
+    now = now.add(const Duration(seconds: 54));
+    c.tick();
+    expect(alerts.countdowns, isEmpty);
+
+    now = now.add(const Duration(milliseconds: 1100)); // 4.9 s left
+    c.tick();
+    c.tick();
+    expect(alerts.countdowns, [const Duration(milliseconds: 4900)]);
+
+    c.adjustRest(15); // back to 19.9 s: stop beeping
+    expect(alerts.stops, 1);
+
+    now = now.add(const Duration(seconds: 15));
+    c.tick();
+    expect(alerts.countdowns, hasLength(2));
+
+    now = now.add(const Duration(seconds: 5));
+    c.tick();
+    expect(c.phase, WorkoutPhase.working);
+    expect(alerts.inApp, 1);
+    c.dispose();
+  });
+
+  test('skipping rest stops sounds', () {
+    final c = make(WorkoutMode.straight);
+    c.logSet();
+    c.skipRest();
+    expect(alerts.stops, 1);
+    expect(c.phase, WorkoutPhase.working);
     c.dispose();
   });
 }

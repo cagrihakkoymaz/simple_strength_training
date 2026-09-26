@@ -50,6 +50,7 @@ class WorkoutController extends ChangeNotifier {
   WorkoutPhase _phase = WorkoutPhase.working;
   DateTime? _restEndsAt;
   Timer? _ticker;
+  bool _countdownSignalled = false;
 
   WorkoutPhase get phase => _phase;
   int get stepIndex => _index;
@@ -62,12 +63,14 @@ class WorkoutController extends ChangeNotifier {
   int get totalSets => plan.length;
 
   DateTime? get restEndsAt => _restEndsAt;
-  int get restRemainingSeconds {
+  Duration get restRemaining {
     final end = _restEndsAt;
-    if (end == null) return 0;
-    final ms = end.difference(_now()).inMilliseconds;
-    return ms <= 0 ? 0 : (ms / 1000).ceil();
+    if (end == null) return Duration.zero;
+    final left = end.difference(_now());
+    return left.isNegative ? Duration.zero : left;
   }
+
+  int get restRemainingSeconds => (restRemaining.inMilliseconds / 1000).ceil();
 
   /// Log the current set. [reps] defaults to the target (success).
   void logSet([int? reps]) {
@@ -99,6 +102,11 @@ class WorkoutController extends ChangeNotifier {
       skipRest();
       return;
     }
+    if (_countdownSignalled && restRemaining > const Duration(seconds: kCountdownSeconds)) {
+      // Extended out of the countdown window: stop beeping, count down again later.
+      _countdownSignalled = false;
+      alerts.stopSounds();
+    }
     alerts.scheduleRestEnd(_restEndsAt!, _nextSetText());
     notifyListeners();
   }
@@ -107,6 +115,7 @@ class WorkoutController extends ChangeNotifier {
     if (_phase != WorkoutPhase.resting) return;
     _endRest();
     alerts.cancelRestEnd();
+    alerts.stopSounds();
     notifyListeners();
   }
 
@@ -118,14 +127,22 @@ class WorkoutController extends ChangeNotifier {
       }
     }
     alerts.cancelRestEnd();
+    alerts.stopSounds();
     _finish();
   }
 
   /// Checks the rest timer; called by the ticker and when the app resumes.
   void tick() {
-    if (_phase == WorkoutPhase.resting && restRemainingSeconds <= 0) {
-      _endRest();
-      alerts.restEndedInApp();
+    if (_phase == WorkoutPhase.resting) {
+      final left = restRemaining;
+      if (!_countdownSignalled && left > Duration.zero && left <= const Duration(seconds: kCountdownSeconds)) {
+        _countdownSignalled = true;
+        alerts.countdownStarted(left);
+      }
+      if (left == Duration.zero) {
+        _endRest();
+        alerts.restEndedInApp();
+      }
     }
     notifyListeners();
   }
@@ -157,8 +174,9 @@ class WorkoutController extends ChangeNotifier {
   void _startRest(int seconds) {
     _phase = WorkoutPhase.resting;
     _restEndsAt = _now().add(Duration(seconds: seconds));
+    _countdownSignalled = false;
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) => tick());
+    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => tick());
     alerts.scheduleRestEnd(_restEndsAt!, _nextSetText());
   }
 
@@ -183,7 +201,10 @@ class WorkoutController extends ChangeNotifier {
   @override
   void dispose() {
     _ticker?.cancel();
-    if (_phase == WorkoutPhase.resting) alerts.cancelRestEnd();
+    if (_phase == WorkoutPhase.resting) {
+      alerts.cancelRestEnd();
+      alerts.stopSounds();
+    }
     super.dispose();
   }
 }

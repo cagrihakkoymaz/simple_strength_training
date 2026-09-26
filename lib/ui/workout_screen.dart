@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../logic/workout_plan.dart';
+import '../state/rest_alerts.dart';
 import '../state/workout_controller.dart';
 import 'finish_screen.dart';
 import 'widgets/common.dart';
@@ -202,7 +203,11 @@ class _RestView extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             '${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}',
-            style: theme.textTheme.displayLarge!.copyWith(fontSize: 96, fontFeatures: const [FontFeature.tabularFigures()]),
+            style: theme.textTheme.displayLarge!.copyWith(
+              fontSize: 96,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: remaining <= kCountdownSeconds ? theme.colorScheme.error : null,
+            ),
           ),
           const SizedBox(height: 16),
           Row(

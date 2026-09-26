@@ -12,6 +12,15 @@ enum RestAlertMode {
   final String label;
 }
 
+/// What happens to other apps' audio (YouTube Music, Spotify…) while beeping.
+enum OtherAudioMode {
+  duck('Lower volume'),
+  pause('Pause');
+
+  const OtherAudioMode(this.label);
+  final String label;
+}
+
 class Settings extends ChangeNotifier {
   Settings(this._prefs);
 
@@ -21,6 +30,8 @@ class Settings extends ChangeNotifier {
   static const _kExerciseRest = 'exercise_rest_seconds';
   static const _kMode = 'last_mode';
   static const _kAlert = 'rest_alert_mode';
+  static const _kCountdown = 'countdown_beeps';
+  static const _kOtherAudio = 'other_audio_mode';
 
   /// Rest after each set (straight) or after each round (circuit).
   int get setRestSeconds => _prefs.getInt(_kSetRest) ?? 60;
@@ -34,6 +45,24 @@ class Settings extends ChangeNotifier {
     (m) => m.name == _prefs.getString(_kAlert),
     orElse: () => RestAlertMode.soundAndVibration,
   );
+
+  /// Beep each of the last 5 seconds of rest.
+  bool get countdownBeeps => _prefs.getBool(_kCountdown) ?? true;
+
+  OtherAudioMode get otherAudioMode => OtherAudioMode.values.firstWhere(
+    (m) => m.name == _prefs.getString(_kOtherAudio),
+    orElse: () => OtherAudioMode.duck,
+  );
+
+  Future<void> setCountdownBeeps(bool v) async {
+    await _prefs.setBool(_kCountdown, v);
+    notifyListeners();
+  }
+
+  Future<void> setOtherAudioMode(OtherAudioMode m) async {
+    await _prefs.setString(_kOtherAudio, m.name);
+    notifyListeners();
+  }
 
   Future<void> setSetRestSeconds(int v) => _setInt(_kSetRest, v);
   Future<void> setExerciseRestSeconds(int v) => _setInt(_kExerciseRest, v);

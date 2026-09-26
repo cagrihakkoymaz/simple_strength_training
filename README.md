@@ -10,7 +10,8 @@ A small offline Flutter app for the **Goliaz Strength Training** program:
 - Starts with Pull-ups (group 11), Push-ups (20), and Squats (30). You can add, edit, or hide exercises.
 - **Straight sets** or **Circuit** mode, chosen for each workout.
 - Adjustable rest (between sets/rounds and between exercises) with a big countdown, ±15 s, and Skip.
-  A notification with sound or vibration fires when rest ends, even when the screen is off.
+- Audible countdown for the last 5 seconds of rest, played at media volume so it works in silent/Do Not Disturb.
+  While it beeps, YouTube Music or Spotify is lowered or paused (your choice).
 - One tap for a successful set. *Failed* lets you enter the reps you actually did. You can tap any logged set to correct it.
 - After a workout you choose **Next group** or **Stay**. The app preselects based on the result.
 - History with dates, groups, and every set, plus progress charts and training-day counts.
@@ -24,8 +25,9 @@ A small offline Flutter app for the **Goliaz Strength Training** program:
 **From a computer (USB debugging on):**
 ```bash
 flutter build apk --release --split-per-abi
-flutter install            # or: adb install build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk   # -r keeps your data
 ```
+Avoid `flutter install`. It uninstalls the app first, which deletes your workout history.
 
 ## Develop
 ```bash

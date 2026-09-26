@@ -37,8 +37,15 @@ lib/
 - Storage: sqflite. Tables `exercises`, `sessions`, `exercise_results` (targets/actuals are stored as CSV strings of 7 ints).
   History rows keep `exercise_name`, so they stay readable after an exercise is renamed or deleted.
 - The rest timer depends on `restEndsAt`, not on counting ticks, so it stays correct in background. `tick()` is called on app resume.
-- Rest-end alert: a scheduled `flutter_local_notifications` notification (exact alarm, falls back to inexact) plus in-app haptic.
-  Two Android channels: `rest_end_sound` and `rest_end_vibrate`. Channel settings are fixed once created on a device.
+- Rest sounds come from the app (`audioplayers`) on the **media** stream, not from notifications. The owner's phone
+  runs in Do Not Disturb/silent, which mutes notification sounds. When 5 s of rest are left, `WorkoutController.tick()` calls
+  `RestAlerts.countdownStarted` once. That plays `assets/sounds/countdown.wav`: beeps at 0–4 s and a long end beep at 5 s,
+  seeked if less than 5 s is left. Playback takes transient audio focus, so other music ducks or pauses
+  (the "Other music while beeping" setting). If countdown beeps are off, `end.wav` plays when rest ends.
+  Regenerate the sounds with `python3 tool/generate_sounds.py`.
+- A silent, vibrating notification (channel `rest_end_silent`) is scheduled for rest end as a fallback when the screen is off.
+  It uses an exact alarm and falls back to inexact. Channel settings are fixed once a channel is created on a device, so
+  change the channel id to change them. The old channels are deleted in `init()`.
 - Ownership: `WorkoutScreen` creates the `WorkoutController`; when the workout finishes, `FinishScreen` takes ownership and disposes it.
 
 ## Commands
@@ -48,7 +55,8 @@ flutter analyze                 # must be clean
 flutter test                    # unit + widget tests (sqflite via sqflite_common_ffi in-memory)
 flutter run                     # phone connected with USB debugging, or emulator
 flutter build apk --release --split-per-abi   # phone APK: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-flutter install                 # install the release build on the connected phone
+adb install -r build/app/outputs/flutter-apk/app-release.apk   # update the phone and KEEP data
+# NOTE: `flutter install` uninstalls first and wipes the app's data – don't use it on the owner's phone.
 ```
 
 ## Conventions
