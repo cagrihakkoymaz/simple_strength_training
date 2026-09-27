@@ -66,3 +66,6 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk   # update the phon
 - Never commit signing keys (`*.jks`, `key.properties`) or APKs. The release build currently uses the debug signing key, which is fine for personal sideloading.
 - Android: package `com.cagrihakkoymaz.simple_strength_training`. Core library desugaring is required by flutter_local_notifications.
 - CI (`.github/workflows/build.yml`) runs analyze, test, and the APK build on every push to `main` and uploads the arm64 APK as an artifact.
+
+## Future work
+- Garmin fenix 7 watch version: see [garmin_extension_feasability.md](garmin_extension_feasability.md) (feasibility only, not started).
