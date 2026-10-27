@@ -11,6 +11,8 @@ class ExerciseResult {
     required this.targets,
     required this.actuals,
     required this.advanced,
+    this.setSeconds = const [],
+    this.restBeforeSeconds = const [],
   });
 
   final int? id;
@@ -25,6 +27,13 @@ class ExerciseResult {
   /// Whether the user chose to move to the next group after this session.
   final bool advanced;
 
+  /// Per set: seconds from "ready" (rest over) to the set being logged. Null = not timed.
+  /// Empty for workouts saved before timing was recorded.
+  final List<int?> setSeconds;
+
+  /// Per set: rest actually taken before it, after ±15 s and skips. Null = no rest before it.
+  final List<int?> restBeforeSeconds;
+
   bool get unbroken => isUnbroken(targets, actuals);
   int get totalReps => actuals.fold(0, (a, b) => a + b);
   int get targetReps => targets.fold(0, (a, b) => a + b);
@@ -38,6 +47,8 @@ class ExerciseResult {
     'targets': targets.join(','),
     'actuals': actuals.join(','),
     'advanced': advanced ? 1 : 0,
+    'set_seconds': setSeconds.map((v) => v ?? '').join(','),
+    'rest_before_seconds': restBeforeSeconds.map((v) => v ?? '').join(','),
   };
 
   factory ExerciseResult.fromMap(Map<String, Object?> m) => ExerciseResult(
@@ -48,10 +59,15 @@ class ExerciseResult {
     targets: _parseList(m['targets'] as String),
     actuals: _parseList(m['actuals'] as String),
     advanced: (m['advanced'] as int) == 1,
+    setSeconds: _parseOptionalList(m['set_seconds'] as String?),
+    restBeforeSeconds: _parseOptionalList(m['rest_before_seconds'] as String?),
   );
 
   static List<int> _parseList(String s) =>
       s.isEmpty ? const [] : s.split(',').map(int.parse).toList();
+
+  static List<int?> _parseOptionalList(String? s) =>
+      s == null || s.isEmpty ? const [] : s.split(',').map(int.tryParse).toList();
 }
 
 class WorkoutSession {
@@ -63,6 +79,8 @@ class WorkoutSession {
     required this.setRestSeconds,
     required this.exerciseRestSeconds,
     required this.results,
+    this.rpe,
+    this.note,
   });
 
   final int? id;
@@ -73,6 +91,10 @@ class WorkoutSession {
   final int exerciseRestSeconds;
   final List<ExerciseResult> results;
 
+  /// How hard the workout felt, 1–10. Null = not rated.
+  final int? rpe;
+  final String? note;
+
   bool get allUnbroken => results.every((r) => r.unbroken);
 
   Map<String, Object?> toMap() => {
@@ -82,6 +104,8 @@ class WorkoutSession {
     'mode': mode.name,
     'set_rest_seconds': setRestSeconds,
     'exercise_rest_seconds': exerciseRestSeconds,
+    'rpe': rpe,
+    'note': note,
   };
 
   factory WorkoutSession.fromMap(Map<String, Object?> m, List<ExerciseResult> results) =>
@@ -93,5 +117,7 @@ class WorkoutSession {
         setRestSeconds: m['set_rest_seconds'] as int,
         exerciseRestSeconds: m['exercise_rest_seconds'] as int,
         results: results,
+        rpe: m['rpe'] as int?,
+        note: m['note'] as String?,
       );
 }

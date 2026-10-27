@@ -23,19 +23,26 @@ lib/
   logic/                      pure Dart, unit tested
     progression.dart          isUnbroken / defaultAdvance / nextMax
     workout_plan.dart         WorkoutMode + buildPlan() → ordered PlannedSet list with rest-after
+    analysis_prompt.dart      prompt (program + CSV columns + current groups) for AI feedback
+    training_calendar.dart    training days per week, weekly goal met, week streak (Progress calendar)
   models/                     Exercise, WorkoutSession, ExerciseResult (toMap/fromMap)
-  db/database.dart            sqflite schema v1 + seed; bump _dbVersion and add onUpgrade for schema changes
-  db/repository.dart          all SQL, session save (transaction also updates groups), JSON export/import
+  db/database.dart            sqflite schema v2 + seed; bump _dbVersion and add an onUpgrade step for schema changes
+  db/repository.dart          all SQL, session save (transaction also updates groups), JSON export/import, history CSV
   state/
     app_state.dart            ChangeNotifier: exercises + sessions, used by all screens
     settings.dart             SharedPreferences-backed settings
     workout_controller.dart   one running workout: current set, logged reps, rest timer (end timestamp + clock injection)
     rest_alerts.dart          RestAlerts interface; NotificationRestAlerts schedules a local notification for rest end
   ui/                         screens (home, workout, finish, history, progress, settings) + widgets/common.dart
+    analysis_sheet.dart       "Analyze history": period → share CSV (share_plus) + prompt to clipboard, or save CSV
 ```
 - State management: `provider` + `ChangeNotifier`. No codegen.
 - Storage: sqflite. Tables `exercises`, `sessions`, `exercise_results` (targets/actuals are stored as CSV strings of 7 ints).
   History rows keep `exercise_name`, so they stay readable after an exercise is renamed or deleted.
+  v2 added `sessions.rpe/note` (optional, from the finish screen) and `exercise_results.set_seconds/rest_before_seconds`
+  (CSV with empty entries for unknown; empty for v1 workouts). `test/repository_test.dart` checks the v1 → v2 upgrade.
+- Timing: `set_seconds` = from "ready" (workout start or rest end) to logging the set; `rest_before_seconds` = rest actually
+  taken (after ±15 s/skip). A rest that ends in background counts until `restEndsAt`, not until the app resumes.
 - The rest timer depends on `restEndsAt`, not on counting ticks, so it stays correct in background. `tick()` is called on app resume.
 - Rest sounds come from the app (`audioplayers`) on the **media** stream, not from notifications. The owner's phone
   runs in Do Not Disturb/silent, which mutes notification sounds. When 5 s of rest are left, `WorkoutController.tick()` calls

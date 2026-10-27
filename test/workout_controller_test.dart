@@ -141,4 +141,31 @@ void main() {
     expect(c.phase, WorkoutPhase.working);
     c.dispose();
   });
+
+  test('records set times and the rest actually taken', () {
+    final c = make(WorkoutMode.straight);
+    now = now.add(const Duration(seconds: 20));
+    c.logSet(); // set 1 took 20 s
+    now = now.add(const Duration(seconds: 30));
+    c.adjustRest(15); // 75 s rest in total
+    // App was in background; we notice the end 100 s later.
+    now = now.add(const Duration(seconds: 100));
+    c.tick();
+    expect(c.restBeforeSeconds[0][1], 75);
+    now = now.add(const Duration(seconds: 10)); // 65 s after the rest ended
+    c.logSet();
+    expect(c.setSeconds[0].take(2), [20, 65]);
+
+    now = now.add(const Duration(seconds: 40));
+    c.skipRest();
+    expect(c.restBeforeSeconds[0][2], 40);
+    now = now.add(const Duration(seconds: 15));
+    c.logSet();
+
+    final r = c.buildSession({0: false}, rpe: 7, note: 'tired').results.first;
+    expect(r.setSeconds.take(3), [20, 65, 15]);
+    expect(r.restBeforeSeconds.take(3), [null, 75, 40]);
+    expect(r.setSeconds[3], isNull);
+    c.dispose();
+  });
 }

@@ -6,7 +6,7 @@ import '../models/exercise.dart';
 import '../models/workout_session.dart';
 
 const _backupFormat = 'simple_strength_training';
-const _backupVersion = 1;
+const _backupVersion = 2;
 
 class Repository {
   Repository(this.db);
@@ -91,6 +91,40 @@ class Repository {
       'sessions': sessions,
       'exercise_results': results,
     });
+  }
+
+  /// History as CSV for analysis in a spreadsheet or chatbot: one row per set, oldest first.
+  /// Only workouts started at or after [since], if given.
+  Future<String> exportHistoryCsv({DateTime? since}) async {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String field(String? s) {
+      if (s == null) return '';
+      return s.contains(RegExp('[",\r\n]')) ? '"${s.replaceAll('"', '""')}"' : s;
+    }
+
+    final lines = [
+      'date,start_time,duration_min,mode,set_rest_s,exercise_rest_s,exercise,group_max,set,target,actual,'
+          'set_s,rest_before_s,exercise_unbroken,advanced,rpe,note',
+    ];
+    final sessions = (await getSessions()).reversed.where((s) => since == null || !s.startedAt.isBefore(since));
+    for (final s in sessions) {
+      final t = s.startedAt;
+      final date = '${t.year}-${two(t.month)}-${two(t.day)}';
+      final time = '${two(t.hour)}:${two(t.minute)}';
+      final minutes = s.finishedAt.difference(s.startedAt).inMinutes;
+      for (final r in s.results) {
+        for (var i = 0; i < r.targets.length; i++) {
+          int? at(List<int?> l) => i < l.length ? l[i] : null;
+          lines.add([
+            date, time, minutes, s.mode.name, s.setRestSeconds, s.exerciseRestSeconds,
+            field(r.exerciseName), r.groupMax, i + 1, r.targets[i], at(r.actuals) ?? 0,
+            at(r.setSeconds) ?? '', at(r.restBeforeSeconds) ?? '',
+            r.unbroken ? 1 : 0, r.advanced ? 1 : 0, s.rpe ?? '', field(s.note),
+          ].join(','));
+        }
+      }
+    }
+    return '${lines.join('\n')}\n';
   }
 
   /// Replaces ALL data with the backup. Throws [FormatException] if invalid.

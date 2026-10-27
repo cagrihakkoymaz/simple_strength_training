@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/workout_session.dart';
 import '../state/app_state.dart';
+import 'analysis_sheet.dart';
 import 'widgets/common.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -13,7 +14,16 @@ class HistoryScreen extends StatelessWidget {
     final sessions = context.watch<AppState>().sessions;
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text('History (${sessions.length})')),
+      appBar: AppBar(
+        title: Text('History (${sessions.length})'),
+        actions: [
+          IconButton(
+            tooltip: 'Analyze history',
+            onPressed: sessions.isEmpty ? null : () => showAnalysisSheet(context),
+            icon: const Icon(Icons.insights),
+          ),
+        ],
+      ),
       body: sessions.isEmpty
           ? const Center(child: Text('No workouts yet.'))
           : ListView.builder(
@@ -95,6 +105,13 @@ class SessionDetailScreen extends StatelessWidget {
             '${s.exerciseRestSeconds > 0 ? ' / ${formatSeconds(s.exerciseRestSeconds)} between exercises' : ''}',
             style: theme.textTheme.bodyMedium,
           ),
+          if (s.rpe != null || (s.note?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 4),
+            Text(
+              [if (s.rpe != null) 'Felt ${s.rpe}/10', if (s.note?.isNotEmpty ?? false) s.note!].join(' · '),
+              style: theme.textTheme.bodyMedium!.copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
           const SizedBox(height: 8),
           for (final r in s.results)
             Card(

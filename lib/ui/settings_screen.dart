@@ -10,6 +10,7 @@ import '../models/exercise.dart';
 import '../state/app_state.dart';
 import '../state/rest_alerts.dart';
 import '../state/settings.dart';
+import 'analysis_sheet.dart';
 import 'widgets/common.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -109,12 +110,37 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text('Goliaz Strength Training – max 2 to 49'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TableScreen())),
           ),
+          header('Goal'),
+          ListTile(
+            title: const Text('Weekly goal'),
+            subtitle: const Text('Training days per week, shown on Progress'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: settings.weeklyGoal > 1 ? () => settings.setWeeklyGoal(settings.weeklyGoal - 1) : null,
+                  icon: const Icon(Icons.remove),
+                ),
+                Text('${settings.weeklyGoal}', style: theme.textTheme.titleMedium),
+                IconButton(
+                  onPressed: settings.weeklyGoal < 7 ? () => settings.setWeeklyGoal(settings.weeklyGoal + 1) : null,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+          ),
           header('Backup'),
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Export backup'),
             subtitle: const Text('Save all exercises and history as a JSON file'),
             onTap: () => _export(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.insights),
+            title: const Text('Analyze history'),
+            subtitle: const Text('Share history as CSV with a prompt for an AI chat'),
+            onTap: () => showAnalysisSheet(context),
           ),
           ListTile(
             leading: const Icon(Icons.download),

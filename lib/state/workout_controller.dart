@@ -24,6 +24,8 @@ class WorkoutController extends ChangeNotifier {
        _now = clock ?? DateTime.now {
     targets = [for (final e in exercises) setsForMax(e.currentMax)];
     actuals = [for (final _ in exercises) List<int?>.filled(kSetsPerGroup, null)];
+    setSeconds = [for (final _ in exercises) List<int?>.filled(kSetsPerGroup, null)];
+    restBeforeSeconds = [for (final _ in exercises) List<int?>.filled(kSetsPerGroup, null)];
     plan = buildPlan(
       exerciseCount: exercises.length,
       setsPerExercise: kSetsPerGroup,
@@ -32,6 +34,7 @@ class WorkoutController extends ChangeNotifier {
       exerciseRestSeconds: exerciseRestSeconds,
     );
     startedAt = _now();
+    _readyAt = startedAt;
   }
 
   final List<Exercise> exercises;
@@ -43,12 +46,20 @@ class WorkoutController extends ChangeNotifier {
 
   late final List<List<int>> targets;
   late final List<List<int?>> actuals;
+
+  /// Seconds from "ready" (workout start or rest over) to logging each set.
+  late final List<List<int?>> setSeconds;
+
+  /// Rest actually taken before each set (after ±15 s and skips).
+  late final List<List<int?>> restBeforeSeconds;
   late final List<PlannedSet> plan;
   late final DateTime startedAt;
 
   int _index = 0;
   WorkoutPhase _phase = WorkoutPhase.working;
   DateTime? _restEndsAt;
+  late DateTime _readyAt;
+  DateTime? _restStartedAt;
   Timer? _ticker;
   bool _countdownSignalled = false;
 
@@ -76,7 +87,10 @@ class WorkoutController extends ChangeNotifier {
   void logSet([int? reps]) {
     if (_phase != WorkoutPhase.working) return;
     final p = current;
+    final now = _now();
     actuals[p.exerciseIndex][p.setIndex] = reps ?? currentTarget;
+    setSeconds[p.exerciseIndex][p.setIndex] = now.difference(_readyAt).inSeconds;
+    _readyAt = now;
     if (_index == plan.length - 1) {
       _finish();
       return;
@@ -113,7 +127,7 @@ class WorkoutController extends ChangeNotifier {
 
   void skipRest() {
     if (_phase != WorkoutPhase.resting) return;
-    _endRest();
+    _endRest(_now());
     alerts.cancelRestEnd();
     alerts.stopSounds();
     notifyListeners();
@@ -140,7 +154,8 @@ class WorkoutController extends ChangeNotifier {
         alerts.countdownStarted(left);
       }
       if (left == Duration.zero) {
-        _endRest();
+        // The rest ended at its end time, even if we only notice on resume.
+        _endRest(_restEndsAt!);
         alerts.restEndedInApp();
       }
     }
@@ -152,12 +167,14 @@ class WorkoutController extends ChangeNotifier {
   bool unbrokenFor(int exerciseIndex) =>
       isUnbroken(targets[exerciseIndex], actualsFor(exerciseIndex));
 
-  WorkoutSession buildSession(Map<int, bool> advanceByExerciseIndex) => WorkoutSession(
+  WorkoutSession buildSession(Map<int, bool> advanceByExerciseIndex, {int? rpe, String? note}) => WorkoutSession(
     startedAt: startedAt,
     finishedAt: _now(),
     mode: mode,
     setRestSeconds: setRestSeconds,
     exerciseRestSeconds: exerciseRestSeconds,
+    rpe: rpe,
+    note: note,
     results: [
       for (var i = 0; i < exercises.length; i++)
         ExerciseResult(
@@ -167,20 +184,25 @@ class WorkoutController extends ChangeNotifier {
           targets: targets[i],
           actuals: actualsFor(i),
           advanced: advanceByExerciseIndex[i] ?? false,
+          setSeconds: setSeconds[i],
+          restBeforeSeconds: restBeforeSeconds[i],
         ),
     ],
   );
 
   void _startRest(int seconds) {
     _phase = WorkoutPhase.resting;
-    _restEndsAt = _now().add(Duration(seconds: seconds));
+    _restStartedAt = _now();
+    _restEndsAt = _restStartedAt!.add(Duration(seconds: seconds));
     _countdownSignalled = false;
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => tick());
     alerts.scheduleRestEnd(_restEndsAt!, _nextSetText());
   }
 
-  void _endRest() {
+  void _endRest(DateTime at) {
+    restBeforeSeconds[current.exerciseIndex][current.setIndex] = at.difference(_restStartedAt!).inSeconds;
+    _readyAt = at;
     _ticker?.cancel();
     _ticker = null;
     _restEndsAt = null;

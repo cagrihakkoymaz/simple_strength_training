@@ -4,8 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../logic/training_calendar.dart';
 import '../models/workout_session.dart';
 import '../state/app_state.dart';
+import '../state/settings.dart';
 import 'widgets/common.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -29,11 +31,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final selected = exercises.firstWhere((e) => e.id == _exerciseId, orElse: () => exercises.first);
     final history = app.historyFor(selected.id!);
 
-    final now = DateTime.now();
-    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-    final days = app.sessions.map((s) => DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day)).toSet();
-    final daysThisWeek = days.where((d) => !d.isBefore(weekStart)).length;
-    final daysThisMonth = days.where((d) => d.year == now.year && d.month == now.month).length;
+    final calendar = TrainingCalendar(
+      app.sessions,
+      today: DateTime.now(),
+      weeklyGoal: context.watch<Settings>().weeklyGoal,
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
@@ -42,11 +44,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
         children: [
           Row(
             children: [
-              _Stat(label: 'Days this week', value: '$daysThisWeek'),
-              _Stat(label: 'Days this month', value: '$daysThisMonth'),
+              _Stat(label: 'This week', value: '${calendar.daysThisWeek}/${calendar.weeklyGoal}'),
+              _Stat(label: 'Week streak', value: '${calendar.weekStreak}'),
               _Stat(label: 'Total workouts', value: '${app.sessions.length}'),
             ],
           ),
+          _CalendarCard(calendar: calendar),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -111,6 +114,97 @@ class _Stat extends StatelessWidget {
               Text(label, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Last [_weeks] weeks: columns = weeks, rows = Mon..Sun, shade = exercises trained that day.
+class _CalendarCard extends StatelessWidget {
+  const _CalendarCard({required this.calendar});
+  final TrainingCalendar calendar;
+
+  static const _weeks = 12;
+  static const _gap = 3.0;
+  static const _labelWidth = 18.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final weeks = calendar.weekStarts(_weeks);
+    final today = dayOf(calendar.today);
+    final met = weeks.where(calendar.goalMet).length;
+
+    Color fill(int exercises) => switch (exercises) {
+      0 => scheme.surfaceContainerHighest,
+      1 => scheme.primary.withValues(alpha: 0.4),
+      2 => scheme.primary.withValues(alpha: 0.7),
+      _ => scheme.primary,
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Last $_weeks weeks', style: theme.textTheme.titleMedium),
+            Text(
+              'Goal (${calendar.weeklyGoal} days) met in $met of $_weeks weeks · darker = more exercises',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cell = ((constraints.maxWidth - _labelWidth) / _weeks - _gap).clamp(8.0, 28.0);
+                Widget box({Color? color, BoxBorder? border, Widget? child}) => Container(
+                  width: cell,
+                  height: cell,
+                  margin: const EdgeInsets.all(_gap / 2),
+                  decoration: BoxDecoration(color: color, border: border, borderRadius: BorderRadius.circular(4)),
+                  child: child,
+                );
+                return Column(
+                  children: [
+                    for (var d = 0; d < 7; d++)
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: _labelWidth,
+                            child: Text('MTWTFSS'[d], style: theme.textTheme.labelSmall),
+                          ),
+                          for (final w in weeks)
+                            () {
+                              final day = DateTime(w.year, w.month, w.day + d);
+                              if (day.isAfter(today)) {
+                                return box(border: Border.all(color: scheme.outlineVariant));
+                              }
+                              return box(
+                                color: fill(calendar.exercisesOn(day)),
+                                border: day == today ? Border.all(color: scheme.onSurface, width: 1.5) : null,
+                              );
+                            }(),
+                        ],
+                      ),
+                    // Goal-met marker under each week.
+                    Row(
+                      children: [
+                        const SizedBox(width: _labelWidth),
+                        for (final w in weeks)
+                          box(
+                            child: calendar.goalMet(w)
+                                ? Icon(Icons.check_circle, size: cell * 0.8, color: scheme.primary)
+                                : null,
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

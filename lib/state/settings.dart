@@ -32,6 +32,7 @@ class Settings extends ChangeNotifier {
   static const _kAlert = 'rest_alert_mode';
   static const _kCountdown = 'countdown_beeps';
   static const _kOtherAudio = 'other_audio_mode';
+  static const _kWeeklyGoal = 'weekly_goal_days';
 
   /// Rest after each set (straight) or after each round (circuit).
   int get setRestSeconds => _prefs.getInt(_kSetRest) ?? 60;
@@ -53,6 +54,14 @@ class Settings extends ChangeNotifier {
     (m) => m.name == _prefs.getString(_kOtherAudio),
     orElse: () => OtherAudioMode.duck,
   );
+
+  /// Training days per week to aim for (Progress calendar).
+  int get weeklyGoal => _prefs.getInt(_kWeeklyGoal) ?? 3;
+
+  Future<void> setWeeklyGoal(int v) async {
+    await _prefs.setInt(_kWeeklyGoal, v.clamp(1, 7));
+    notifyListeners();
+  }
 
   Future<void> setCountdownBeeps(bool v) async {
     await _prefs.setBool(_kCountdown, v);

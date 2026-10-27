@@ -21,16 +21,20 @@ class _FinishScreenState extends State<FinishScreen> {
     for (var i = 0; i < c.exercises.length; i++) i: defaultAdvance(c.targets[i], c.actualsFor(i)),
   };
   bool _saving = false;
+  int? _rpe;
+  final _note = TextEditingController();
 
   @override
   void dispose() {
+    _note.dispose();
     c.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final session = c.buildSession(_advance);
+    final note = _note.text.trim();
+    final session = c.buildSession(_advance, rpe: _rpe, note: note.isEmpty ? null : note);
     final newMax = {
       for (var i = 0; i < c.exercises.length; i++)
         c.exercises[i].id!: nextMax(c.exercises[i].currentMax, advance: _advance[i]!),
@@ -82,6 +86,7 @@ class _FinishScreenState extends State<FinishScreen> {
           padding: const EdgeInsets.all(12),
           children: [
             for (var i = 0; i < c.exercises.length; i++) _resultCard(theme, i),
+            _feelingCard(theme),
             const SizedBox(height: 12),
             FilledButton.icon(
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
@@ -95,6 +100,46 @@ class _FinishScreenState extends State<FinishScreen> {
       ),
     );
   }
+
+  Widget _feelingCard(ThemeData theme) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('How hard did it feel? (optional)', style: theme.textTheme.titleMedium),
+          Text('1 = very easy · 10 = all-out', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var v = 1; v <= 10; v++)
+                ChoiceChip(
+                  key: ValueKey('rpe-$v'),
+                  label: SizedBox(width: 20, child: Text('$v', textAlign: TextAlign.center)),
+                  showCheckmark: false,
+                  selected: _rpe == v,
+                  onSelected: (on) => setState(() => _rpe = on ? v : null),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _note,
+            minLines: 1,
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Note (optional)',
+              hintText: 'Sleep, energy, pain, anything unusual',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _resultCard(ThemeData theme, int i) {
     final e = c.exercises[i];

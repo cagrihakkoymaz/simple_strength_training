@@ -1,7 +1,7 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
-const _dbVersion = 1;
+const _dbVersion = 2;
 
 /// Starting groups requested by the user.
 const defaultExercises = [
@@ -21,6 +21,15 @@ Future<Database> openAppDatabase({DatabaseFactory? factory, String? path}) async
       onCreate: (db, _) async {
         await createSchema(db);
         await seedExercises(db);
+      },
+      onUpgrade: (db, oldVersion, _) async {
+        if (oldVersion < 2) {
+          // v2: how the workout felt, and per-set timing.
+          await db.execute('ALTER TABLE sessions ADD COLUMN rpe INTEGER');
+          await db.execute('ALTER TABLE sessions ADD COLUMN note TEXT');
+          await db.execute('ALTER TABLE exercise_results ADD COLUMN set_seconds TEXT');
+          await db.execute('ALTER TABLE exercise_results ADD COLUMN rest_before_seconds TEXT');
+        }
       },
     ),
   );
@@ -42,7 +51,9 @@ Future<void> createSchema(DatabaseExecutor db) async {
       finished_at INTEGER NOT NULL,
       mode TEXT NOT NULL,
       set_rest_seconds INTEGER NOT NULL,
-      exercise_rest_seconds INTEGER NOT NULL
+      exercise_rest_seconds INTEGER NOT NULL,
+      rpe INTEGER,
+      note TEXT
     )''');
   await db.execute('''
     CREATE TABLE exercise_results (
@@ -53,7 +64,9 @@ Future<void> createSchema(DatabaseExecutor db) async {
       group_max INTEGER NOT NULL,
       targets TEXT NOT NULL,
       actuals TEXT NOT NULL,
-      advanced INTEGER NOT NULL
+      advanced INTEGER NOT NULL,
+      set_seconds TEXT,
+      rest_before_seconds TEXT
     )''');
   await db.execute('CREATE INDEX idx_results_session ON exercise_results(session_id)');
   await db.execute('CREATE INDEX idx_results_exercise ON exercise_results(exercise_id)');

@@ -69,6 +69,14 @@ void main() {
     await tester.tap(find.text('Next group (12)'));
     await tester.pump();
 
+    // How it felt.
+    await tester.ensureVisible(find.byKey(const ValueKey('rpe-7')));
+    await tester.tap(find.byKey(const ValueKey('rpe-7')));
+    await tester.enterText(find.byType(TextField), '  Slept badly  ');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Save workout'));
+    await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await tester.tap(find.text('Save workout'));
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -78,5 +86,14 @@ void main() {
     expect(find.text('Group 12'), findsOneWidget);
     expect(app.sessions.single.results.single.actuals, [5, 5, 4, 4, 4, 3, 2]);
     expect(app.sessions.single.results.single.advanced, isTrue);
+    expect(app.sessions.single.rpe, 7);
+    expect(app.sessions.single.note, 'Slept badly');
+    expect(app.sessions.single.results.single.setSeconds, hasLength(7));
+
+    // Progress: weekly goal (default 3) and calendar render without overflow.
+    await tester.tap(find.text('Progress'));
+    await tester.pumpAndSettle();
+    expect(find.text('1/3'), findsOneWidget);
+    expect(find.text('Last 12 weeks'), findsOneWidget);
   });
 }
